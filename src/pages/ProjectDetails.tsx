@@ -480,42 +480,39 @@ export default function ProjectDetails() {
                         {status === 'todo' && (
                           <button 
                             onClick={() => updateTaskStatus(task.id, 'in-progress')} 
-                            className="p-1 px-2 hover:bg-emerald-950/30 rounded text-emerald-500 flex items-center gap-1 transition-all"
+                            className="p-1 px-3 hover:bg-emerald-950/30 rounded text-emerald-500 transition-all active:scale-95"
                             title="Start Task"
                           >
                              <Play className="h-3 w-3 fill-current" />
-                             <span className="text-[8px] font-bold uppercase tracking-widest ml-0.5">Start</span>
                           </button>
                         )}
 
                         {status === 'in-progress' && (
-                          <>
+                          <div className="flex items-center gap-1">
                             <button 
                               onClick={() => updateTaskStatus(task.id, 'completed')} 
-                              className="p-1 px-2 hover:bg-white rounded text-black flex items-center gap-1 transition-all"
-                              title="Complete Task"
+                              className="p-1 px-3 hover:bg-white rounded text-black transition-all shadow-lg active:scale-95"
+                              title="Finish Task"
                             >
                                <CheckCircle2 className="h-3 w-3" />
-                               <span className="text-[8px] font-bold uppercase tracking-widest ml-0.5">Finish</span>
                             </button>
                             <button 
                               onClick={() => updateTaskStatus(task.id, 'todo')} 
-                              className="p-1 px-2 hover:bg-zinc-800 rounded text-zinc-500 flex items-center gap-1 transition-all"
+                              className="p-1 px-2 hover:bg-zinc-800 rounded text-zinc-500 transition-all active:scale-95"
                               title="Revert to Todo"
                             >
                                <RotateCcw className="h-3 w-3" />
                             </button>
-                          </>
+                          </div>
                         )}
 
                         {status === 'completed' && (
                           <button 
                             onClick={() => updateTaskStatus(task.id, 'in-progress')} 
-                            className="p-1 px-2 hover:bg-zinc-800 rounded text-zinc-400 flex items-center gap-1 transition-all"
+                            className="p-1 px-3 hover:bg-zinc-800 rounded text-zinc-400 transition-all active:scale-95"
                             title="Reopen Task"
                           >
                              <RotateCcw className="h-3 w-3" />
-                             <span className="text-[8px] font-bold uppercase tracking-widest ml-0.5">Reopen</span>
                           </button>
                         )}
 
