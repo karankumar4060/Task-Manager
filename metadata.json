@@ -1,0 +1,6 @@
+{
+  "name": "TeamSync Task Manager",
+  "description": "A collaborative full-stack task management platform with role-based access, project tracking, and real-time dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

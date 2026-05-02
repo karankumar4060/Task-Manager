@@ -1,0 +1,134 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function getProjectMember(projectId) {
+      return get(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid));
+    }
+
+    function isProjectMember(projectId) {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid)) ||
+        (exists(/databases/$(database)/documents/projects/$(projectId)) && 
+         request.auth.uid in get(/databases/$(database)/documents/projects/$(projectId)).data.members)
+      );
+    }
+
+    function isProjectAdmin(projectId) {
+      return isSignedIn() && (
+        (exists(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid)).data.role in ['Admin', 'Owner']) ||
+        (exists(/databases/$(database)/documents/projects/$(projectId)) && 
+         get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid)
+      );
+    }
+
+    function isProjectOwner(projectId) {
+      return isSignedIn() && (
+        (exists(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid)).data.role == 'Owner') ||
+        (exists(/databases/$(database)/documents/projects/$(projectId)) && 
+         get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid)
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Users Collection ---
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.keys().hasAll(['uid', 'email', 'role']) &&
+               data.uid is string && data.uid.size() <= 128 &&
+               data.email is string && data.email.size() <= 256 &&
+               data.role in ['Admin', 'Member'];
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming()) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL']);
+    }
+
+    // --- Projects Collection ---
+    match /projects/{projectId} {
+      function isValidProject(data) {
+        return data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+               data.ownerId == request.auth.uid &&
+               data.members is list && data.members.size() > 0 &&
+               request.auth.uid in data.members;
+      }
+
+      function isMemberInDoc(data) {
+        return isSignedIn() && data.members is list && request.auth.uid in data.members;
+      }
+
+      allow get: if isProjectMember(projectId) || isMemberInDoc(existing()) || existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && (
+        (resource.data.members is list && request.auth.uid in resource.data.members) ||
+        (resource.data.ownerId == request.auth.uid)
+      );
+      allow create: if isSignedIn() && isValidProject(incoming());
+      allow update: if isProjectAdmin(projectId) && (
+        incoming().name is string && incoming().name.size() > 0 &&
+        incoming().members is list && request.auth.uid in incoming().members
+      );
+      allow delete: if isProjectOwner(projectId);
+
+      // --- Members Subcollection ---
+      match /members/{memberId} {
+        allow read: if isProjectMember(projectId);
+        allow create: if isSignedIn() && (
+          isProjectAdmin(projectId) || 
+          get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid
+        );
+        allow update, delete: if isProjectAdmin(projectId);
+      }
+
+      // --- Tasks Subcollection ---
+      match /tasks/{taskId} {
+        function isValidTask(data) {
+          return data.projectId == projectId &&
+                 data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+                 data.status in ['todo', 'in-progress', 'completed'] &&
+                 data.priority in ['low', 'medium', 'high'] &&
+                 data.createdBy == request.auth.uid;
+        }
+
+        allow read: if isProjectMember(projectId);
+        allow create: if isProjectMember(projectId) && (
+          incoming().projectId == projectId &&
+          incoming().createdBy == request.auth.uid
+        );
+        allow update: if isProjectMember(projectId) && (
+          isProjectAdmin(projectId) || 
+          (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'assignedTo', 'updatedAt']) && incoming().createdBy == existing().createdBy)
+        );
+        allow delete: if isProjectAdmin(projectId);
+      }
+    }
+  }
+}
